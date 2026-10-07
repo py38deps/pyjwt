@@ -4,8 +4,78 @@ Changelog
 All notable changes to this project will be documented in this file.
 This project adheres to `Semantic Versioning <https://semver.org/>`__.
 
-`Unreleased <https://github.com/jpadilla/pyjwt/compare/2.14.0...HEAD>`__
+`Unreleased <https://github.com/jpadilla/pyjwt/compare/2.15.1...HEAD>`__
 -------------------------------------------------------------------------
+
+`v2.15.1 <https://github.com/jpadilla/pyjwt/compare/2.15.0...2.15.1>`__
+-----------------------------------------------------------------------
+
+Fixed
+~~~~~
+
+- Accept trailing Base64URL ``=`` padding when decoding JWS segments, so
+  tokens issued by AWS ALB and similar systems verify instead of raising
+  ``DecodeError: Invalid crypto padding``. Non-alphabet junk such as
+  ``!!!!`` remains rejected (`#1209 <https://github.com/jpadilla/pyjwt/issues/1209>`__).
+
+`v2.15.0 <https://github.com/jpadilla/pyjwt/compare/2.14.0...2.15.0>`__
+-----------------------------------------------------------------------
+
+Security
+~~~~~~~~
+
+- Wrap recursion errors from deeply nested JWT payloads in ``DecodeError``
+  instead of exposing a raw ``RecursionError``.
+
+Added
+~~~~~
+
+- Support Python 3.15 by @kytta in `#1202 <https://github.com/jpadilla/pyjwt/pull/1202>`__
+
+Changed
+~~~~~~~
+
+- ``JWKSetCache`` now stores the parsed ``PyJWKSet`` rather than the raw JWKS
+  payload, so a cache hit no longer re-parses every key. ``JWKSetCache.put()``
+  accepts either form and raises ``PyJWKSetError`` for anything else. As a
+  result, ``PyJWKClient.get_jwk_set()`` returns the same ``PyJWKSet`` instance
+  for as long as it stays cached, rather than a freshly built one per call in
+  `#1208 <https://github.com/jpadilla/pyjwt/pull/1208>`__
+- ``PyJWKClient.fetch_data()`` now raises
+  ``PyJWKClientError("The JWKS endpoint did not return a JSON object")`` when
+  the endpoint response is not a JSON object, instead of returning it for
+  ``get_jwk_set()`` to reject. Callers reaching the JWKS through
+  ``get_jwk_set()`` see the same error as before in
+  `#1208 <https://github.com/jpadilla/pyjwt/pull/1208>`__
+
+Fixed
+~~~~~
+
+- Return cached ``PyJWKSet`` values from ``PyJWKClient.get_jwk_set()`` instead
+  of raising ``PyJWKClientError("The JWKS endpoint did not return a JSON
+  object")``. ``JWKSetCache.put()`` documents ``PyJWKSet`` as the cached value,
+  so callers pre-populating the cache to avoid a network round-trip could not
+  read it back in `#914 <https://github.com/jpadilla/pyjwt/issues/914>`__ and
+  `#1208 <https://github.com/jpadilla/pyjwt/pull/1208>`__
+- ``PyJWKClient.get_jwk_set()`` now caches the key set it returns, so a
+  ``fetch_data()`` override that filters or transforms the JWKS is no longer
+  undone by the next cache hit in
+  `#1208 <https://github.com/jpadilla/pyjwt/pull/1208>`__
+- Raise the documented ``PyJWTError`` subclass instead of leaking a
+  ``TypeError`` when the ``exp``, ``nbf``, or ``iat`` claim decodes to a
+  non-numeric, non-string value such as a list, dict, or ``null``.
+- Reject OKP JWK private keys when their public ``x`` component does not
+  match the private ``d`` component.
+- Treat malformed JWK Set members as unusable keys rather than letting
+  ``AttributeError`` or ``TypeError`` escape ``PyJWKSet``. A member that is not
+  a JSON object is skipped, a key whose components have the wrong type raises
+  ``InvalidKeyError`` and is skipped, and a set left with no usable keys raises
+  ``PyJWKSetError``. A single bad entry no longer fails an otherwise usable
+  JWK Set in `#1208 <https://github.com/jpadilla/pyjwt/pull/1208>`__
+- Wrap ``http.client.HTTPException`` (e.g. ``IncompleteRead`` from a
+  truncated response) in ``PyJWKClient.fetch_data`` as
+  ``PyJWKClientConnectionError``, matching the other network failure
+  modes the method already documents.
 
 `v2.14.0 <https://github.com/jpadilla/pyjwt/compare/2.13.0...2.14.0>`__
 -----------------------------------------------------------------------
@@ -29,9 +99,11 @@ Security
   errors or whole-set parsing failures. See
   `GHSA-8wjv-2p76-3863 <https://github.com/jpadilla/pyjwt/security/advisories/GHSA-8wjv-2p76-3863>`__
   and `GHSA-w6j9-cwv2-h6wq <https://github.com/jpadilla/pyjwt/security/advisories/GHSA-w6j9-cwv2-h6wq>`__.
-- Enforce detached-payload and compact JWS encoding rules during decoding.
-  See `GHSA-hxm8-2xgr-2p9m <https://github.com/jpadilla/pyjwt/security/advisories/GHSA-hxm8-2xgr-2p9m>`__
-  and `GHSA-mvj7-wp6q-v59j <https://github.com/jpadilla/pyjwt/security/advisories/GHSA-mvj7-wp6q-v59j>`__.
+- Enforce compact JWS encoding rules during decoding. See
+  `GHSA-hxm8-2xgr-2p9m <https://github.com/jpadilla/pyjwt/security/advisories/GHSA-hxm8-2xgr-2p9m>`__.
+- Reject detached-payload arguments for attached JWS inputs. Thanks to `@xclow3n
+  <https://github.com/xclow3n>`__ for reporting this behavior; fixed in commit
+  `37b54877 <https://github.com/jpadilla/pyjwt/commit/37b54877bf7bea67e8149130e96929e3ec798122>`__.
 
 Fixed
 ~~~~~
